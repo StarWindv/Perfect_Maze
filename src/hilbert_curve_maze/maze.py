@@ -15,7 +15,6 @@ def curve_print(curve: list):
         print("[]")
         return
 
-    # 计算每列的最大宽度（共8列）
     col_widths = [0] * 8
     for i, point in enumerate(curve):
         col_idx = i % 8
@@ -28,29 +27,24 @@ def curve_print(curve: list):
     remainder = total % 8
 
     print("[")
-    # 打印完整行
     for i in range(lines):
         start_idx = i * 8
         line_elements = []
         for j in range(8):
             element = curve[start_idx + j]
             s = str(element)
-            # 左对齐到该列最大宽度
             line_elements.append(s.ljust(col_widths[j]))
         line_str = "    " + ", ".join(line_elements)
-        # 非最后一行或最后一行有剩余元素时加逗号
         if i < lines - 1 or remainder > 0:
             line_str += ","
         print(line_str)
 
-    # 打印剩余元素行
     if remainder > 0:
         start_idx = lines * 8
         line_elements = []
         for j in range(remainder):
             element = curve[start_idx + j]
             s = str(element)
-            # 左对齐到该列最大宽度
             line_elements.append(s.ljust(col_widths[j]))
         line_str = "    " + ", ".join(line_elements)
         print(line_str)
@@ -140,8 +134,6 @@ class _HilbertCurve:
 
 class _HilbertMaze(_HilbertCurve):
     """"""
-
-
     def __init__(
             self,
             order: int,
@@ -156,24 +148,31 @@ class _HilbertMaze(_HilbertCurve):
         self.save_dir = save_dir
         self.save_name = save_name
         self.curve = None
+        self.maze  = None
         self.coord_map = None
         self.maze_start = self.maze_end = (-1, -1)
+        self.solution_path = []  # 存储解路径坐标（按顺序）
+        self.curve_maze_solve = []  # 存储解路径坐标（按坐标排序）
 
     # noinspection PyTypeChecker
-    def save_text(self, path: str = None, filename: str = None):
+    def _save_maze(self, path: str = None, filename: str = None):
         if path is None:
             path = self.save_dir
         if filename is None:
-            filename = self.save_name + ".txt"
-        self._generate(self.order)
+            filename = self.save_name + ".curve.txt"
+        if self.maze is None:
+            self._generate(self.order)
         with open(os.path.join(path, filename), "w", encoding="utf-8") as f:
             json.dump(self.curve, f)
-        file2 = filename + ".coord_map"
+        file2 = filename.split(".")[0] + ".coord_map"
         with open(os.path.join(path, file2), 'wb') as f:
             pickle.dump(self.coord_map, f)
+        file3 = filename.split(".")[0] + ".maze"
+        np.save(os.path.join(path, file3), self.maze)
 
-    def load_text(self, maze_path, coord_map_path):
-        with open(maze_path, 'r', encoding="utf-8") as f:
+    def _load_maze(self, maze_path, coord_map_path, curve_path):
+        self.maze = np.load(maze_path)
+        with open(curve_path, 'r', encoding="utf-8") as f:
             self.curve = json.load(f)
         with open(coord_map_path, 'rb') as f:
             self.coord_map = pickle.load(f)
@@ -189,11 +188,7 @@ class _HilbertMaze(_HilbertCurve):
         Returns:
             tuple[Any, Any, Any]
         """
-        if self.curve is not None and self.coord_map is not None:
-            curve, coord_map = self.curve, self.coord_map
-            print(f"[DEBUG] USE LOAD CURVE TO BUILD MAZE") # PASS SUCCEED
-        else:
-            curve, coord_map = self._build(order)
+        curve, coord_map = self._build(order)
         size = 1 << order  # 2^order
         total_cells = size * size
 
@@ -277,14 +272,19 @@ class _HilbertMaze(_HilbertCurve):
             None
         """
         # Create a custom color mapping
-        maze, start, end = self._generate(self.order)
+        if self.maze is not None:
+            maze = self.maze
+            start = self.maze_start
+            end = self.maze_end
+        else:
+            maze, start, end = self._generate(self.order)
 
-        cmap = ListedColormap(['white', 'black', 'green', 'red'])
+        cmap = ListedColormap(['white', 'black', '#9F2B68', '#E49B0F'])
 
         # Copy the maze for visual marking
         display_maze = maze.copy().astype(float)
 
-        # Mark the starting point (green) and the ending point (red)
+        # Mark the starting point (#E49B0F) and the ending point (#9F2B68)
         s_x, s_y = 2 * start[0] + 1, 2 * start[1] + 1
         e_x, e_y = 2 * end[0] + 1, 2 * end[1] + 1
         display_maze[s_x, s_y] = 2
@@ -310,6 +310,100 @@ class _HilbertMaze(_HilbertCurve):
             plt.axvline(j - 0.5, color='gray', linewidth=0.5, alpha=0.3)
 
         plt.title(f"Hilbert Maze\norder = {self.order}")
+        plt.axis('off')
+        plt.show()
+
+    def _solve(self):
+        """
+        Solve the maze path using the DFS algorithm
+        Returns: None
+
+        """
+        if self.maze is None:
+            self._generate(self.order)
+
+        # get maze's size
+        size = 1 << self.order
+        total_size = 2 * size + 1
+
+        # the location of start and end in the maze
+        start = (2 * self.maze_start[0] + 1, 2 * self.maze_start[1] + 1)
+        end = (2 * self.maze_end[0] + 1, 2 * self.maze_end[1] + 1)
+
+        # solve
+        stack = [start]
+        visited = np.zeros((total_size, total_size), dtype=bool)
+        parent = {}
+        visited[start] = True
+
+        while stack:
+            x, y = stack.pop()
+
+            if (x, y) == end:
+                path = []
+                current = end
+                while current != start:
+                    path.append(current)
+                    current = parent[current]
+                path.append(start)
+                path.reverse()
+                self.solution_path = path
+                curve_path = []
+                for px, py in path:
+                    if px % 2 == 1 and py % 2 == 1:
+                        curve_path.append(((px - 1) // 2, (py - 1) // 2))
+                self.curve_maze_solve = sorted(curve_path, key=lambda p: (p[0], p[1]))
+                return
+
+            for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < total_size and 0 <= ny < total_size and not visited[nx, ny]:
+                    if self.maze[nx, ny] == 0 or (nx, ny) == end:
+                        visited[nx, ny] = True
+                        stack.append((nx, ny))
+                        parent[(nx, ny)] = (x, y)
+
+        raise RuntimeError("[Err ] Maze No Solution Error! This is should not occurred.")
+
+    def _display_and_solve(self):
+        if self.maze is None:
+            self._generate(self.order)
+
+        if not self.solution_path:
+            self._solve()
+
+        cmap = ListedColormap(['white', 'black', '#9F2B68', '#E49B0F', '#89cff0'])
+
+        display_maze = self.maze.copy().astype(float)
+
+        for (x, y) in self.solution_path:
+            display_maze[x, y] = 4
+
+        s_x, s_y = 2 * self.maze_start[0] + 1, 2 * self.maze_start[1] + 1
+        e_x, e_y = 2 * self.maze_end[0] + 1, 2 * self.maze_end[1] + 1
+        display_maze[s_x, s_y] = 2
+        display_maze[e_x, e_y] = 3
+
+        size = (display_maze.shape[1] - 1) // 2
+        if self.maze_start[1] == 0:
+            display_maze[s_x, 0] = 2
+        elif self.maze_start[0] == 0:
+            display_maze[0, s_y] = 2
+
+        if self.maze_end[1] == size - 1:
+            display_maze[e_x, 2 * size] = 3
+        elif self.maze_end[0] == size - 1:
+            display_maze[2 * size, e_y] = 3
+
+        plt.figure(figsize=(10, 10))
+        plt.imshow(display_maze, cmap=cmap, interpolation='nearest')
+
+        for i in range(0, display_maze.shape[0] + 1):
+            plt.axhline(i - 0.5, color='gray', linewidth=0.5, alpha=0.3)
+        for j in range(0, display_maze.shape[1] + 1):
+            plt.axvline(j - 0.5, color='gray', linewidth=0.5, alpha=0.3)
+
+        plt.title(f"Hilbert Maze Solution\norder = {self.order}")
         plt.axis('off')
         plt.show()
 
@@ -374,15 +468,23 @@ class HilbertMaze(_HilbertMaze):
     def display(self):
         self._show()
 
+    def save_maze(self, **kwargs):
+        self._save_maze(**kwargs)
+
+    def load_maze(self, *args):
+        self._load_maze(*args)
+
+    def solve_and_display(self):
+        self._display_and_solve()
+
 
 if __name__ == "__main__":
     test = HilbertMaze(
-        order=4,
+        order=5,
         full_maze=True,
-        info=True,
+        info=False,
     )
-    # test.save_text()
-    test.load_text("./Hilbert_maze.txt", "Hilbert_maze.txt.coord_map")
-    # print(test.curve)
-    # print(test.coord_map)
-    test.display()
+    # test.load_maze("Hilbert_maze.maze.npy", "Hilbert_maze.coord_map", "Hilbert_maze.curve.txt")
+    # test.display()
+    test.solve_and_display()
+    test.save_maze()
