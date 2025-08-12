@@ -1,6 +1,6 @@
 # PerfectMaze
 
-[English](https://github.com/starwindv/PerfectMaze/blob/main/readme.md)
+[Chinese](https://github.com/starwindv/PerfectMaze/blob/main/readme_cn.md)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/starwindv/PerfectMaze/blob/main/LICENSE)
 ![Python Version](https://img.shields.io/badge/python-3.10+-orange)
