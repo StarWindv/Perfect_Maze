@@ -41,7 +41,7 @@ maze_gen.solve_and_display()
 
 ## Example Output
 
-![Hilbert Maze](https://raw.github.com/StarWindv/PerfectMaze/blob/main/assets/order6_1.png)
+![Hilbert Maze](https://raw.githubusercontent.com/StarWindv/PerfectMaze/refs/heads/main/assets/order6_1.png)
 *Example of a Hilbert maze with order 6*
 
 ## API Reference
