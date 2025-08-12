@@ -41,7 +41,7 @@ maze_gen.solve_and_display()
 
 ## 示例输出
 
-![Hilbert Maze](https://github.com/StarWindv/PerfectMaze/blob/main/assets/order6_1.png)
+![Hilbert Maze](https://raw.githubusercontent.com/StarWindv/PerfectMaze/refs/heads/main/assets/order6_1.png)
 *阶数为6的希尔伯特迷宫示例*
 
 ## API参考
@@ -87,5 +87,6 @@ is_perfect = is_perfect_maze(maze_grid)
 欢迎贡献！请通过 GitHub Issues 提交问题或建议，通过 Pull Requests 提交代码改进。
 
 ## 许可证
+
 
 本项目采用 [MIT](https://github.com/starwindv/PerfectMaze/blob/main/LICENSE) 许可证。
